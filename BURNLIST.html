@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Burnlist</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔥</text></svg>">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --cyan: #1ECFE6;
+      --green: #32C36A;
+      --gold: #EBC166;
+      --pink: #F73676;
+      --purple: #A362A4;
+
+      --ink: #14141A;
+      --ink-2: #2C2C36;
+      --muted: #6B6B78;
+      --line: #1414140F;
+      --line-strong: #14141422;
+      --paper: #FAFAF5;
+      --paper-2: #F2F0E8;
+      --card: #FFFFFF;
+
+      --lead: var(--green);
+      --lead-on: #FFFFFF;
+
+      --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-mono);
+      background: var(--paper);
+      color: var(--ink);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 64px 24px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 960px;
+    }
+
+    header {
+      margin-bottom: 40px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    h1 {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      flex-shrink: 0;
+    }
+
+    .progress-bar {
+      flex: 1;
+      height: 2px;
+      background: var(--line-strong);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: var(--lead);
+      border-radius: 2px;
+      transition: width 0.4s ease;
+      width: 0%;
+    }
+
+    .progress-label {
+      font-size: 10px;
+      color: var(--muted);
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+
+    .list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 16px;
+      background: var(--card);
+      border: 1px solid var(--line-strong);
+      border-radius: 6px;
+      cursor: grab;
+      user-select: none;
+      transition: background 0.15s, opacity 0.2s, border-color 0.15s;
+      position: relative;
+    }
+
+    .item:active {
+      cursor: grabbing;
+    }
+
+    .item.dragging {
+      opacity: 0.4;
+      cursor: grabbing;
+    }
+
+    .item.drag-over {
+      border-color: var(--lead);
+      background: #f0fdf6;
+    }
+
+    .item.done {
+      background: var(--paper-2);
+      border-color: var(--line);
+      opacity: 0.8;
+    }
+
+    .checkbox-wrap {
+      flex-shrink: 0;
+      position: relative;
+      width: 18px;
+      height: 18px;
+    }
+
+    .checkbox-wrap input[type="checkbox"] {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border: 1.5px solid var(--line-strong);
+      border-radius: 4px;
+      background: var(--card);
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+      display: block;
+    }
+
+    .checkbox-wrap input[type="checkbox"]:checked {
+      background: transparent;
+      border-color: var(--line-strong);
+    }
+
+    .checkbox-wrap input[type="checkbox"]:checked::after {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 6px;
+      width: 5px;
+      height: 9px;
+      border: 2px solid var(--muted);
+      border-top: none;
+      border-left: none;
+      transform: rotate(45deg);
+    }
+
+    /* Text wrapper for highlight underline effect */
+    .item-text-wrap {
+      flex: 0 0 auto;
+      width: fit-content;
+      min-width: 33%;
+      position: relative;
+      display: inline-block;
+      cursor: text;
+    }
+
+    .item-text {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--ink);
+      line-height: 1.4;
+      transition: color 0.2s;
+      display: inline-block;
+      vertical-align: middle;
+      position: relative;
+      z-index: 1;
+      outline: none;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .item-text:focus {
+      outline: none;
+    }
+
+    .item[data-highlight]::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 4px;
+      border-radius: 6px 0 0 6px;
+    }
+
+    .item[data-highlight="cyan"]::before   { background: var(--cyan); }
+    .item[data-highlight="green"]::before  { background: var(--green); }
+    .item[data-highlight="gold"]::before   { background: var(--gold); }
+    .item[data-highlight="pink"]::before   { background: var(--pink); }
+    .item[data-highlight="purple"]::before { background: var(--purple); }
+
+    .item.done .item-text {
+      color: var(--muted);
+      text-decoration: line-through;
+      text-decoration-color: var(--muted);
+    }
+
+    .item-index {
+      font-size: 10px;
+      color: #c0c0c8;
+      flex-shrink: 0;
+      min-width: 16px;
+      text-align: right;
+      margin-left: auto;
+    }
+
+    /* Context menu */
+    .ctx-menu {
+      position: fixed;
+      background: var(--card);
+      border: 1px solid var(--line-strong);
+      border-radius: 8px;
+      padding: 6px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1), 0 1px 4px rgba(0,0,0,0.06);
+      z-index: 1000;
+      display: none;
+      min-width: 148px;
+    }
+
+    .ctx-menu.visible {
+      display: block;
+    }
+
+    .ctx-label {
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      padding: 4px 8px 6px;
+    }
+
+    .ctx-colors {
+      display: flex;
+      gap: 6px;
+      padding: 2px 8px 6px;
+      align-items: center;
+    }
+
+    .ctx-swatch {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: transform 0.1s, border-color 0.1s;
+      flex-shrink: 0;
+    }
+
+    .ctx-swatch:hover {
+      transform: scale(1.15);
+    }
+
+    .ctx-swatch.active {
+      border-color: var(--ink);
+    }
+
+    .ctx-swatch[data-color="cyan"]   { background: var(--cyan); }
+    .ctx-swatch[data-color="green"]  { background: var(--green); }
+    .ctx-swatch[data-color="gold"]   { background: var(--gold); }
+    .ctx-swatch[data-color="pink"]   { background: var(--pink); }
+    .ctx-swatch[data-color="purple"] { background: var(--purple); }
+
+    .ctx-divider {
+      height: 1px;
+      background: var(--line-strong);
+      margin: 4px 0;
+    }
+
+    .ctx-clear {
+      font-size: 11px;
+      color: var(--muted);
+      padding: 6px 8px;
+      cursor: pointer;
+      border-radius: 4px;
+      transition: background 0.1s, color 0.1s;
+    }
+
+    .ctx-clear:hover {
+      background: var(--paper-2);
+      color: var(--ink);
+    }
+
+    .sections {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      align-items: start;
+    }
+
+    .section {
+      margin-bottom: 0;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      min-height: 28px;
+    }
+
+    .section-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .btn-new-task {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      background: transparent;
+      border: 1px solid var(--line-strong);
+      border-radius: 4px;
+      padding: 3px 8px;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s;
+    }
+
+    .btn-new-task:hover {
+      color: var(--ink);
+      border-color: var(--ink-2);
+    }
+
+    /* Empty list drop target */
+    .list:empty {
+      min-height: 48px;
+      border: 1px dashed var(--line-strong);
+      border-radius: 6px;
+    }
+
+    .item-delete {
+      flex-shrink: 0;
+      opacity: 0;
+      transition: opacity 0.2s;
+      cursor: pointer;
+      color: var(--muted);
+      line-height: 1;
+      padding: 2px;
+      border-radius: 3px;
+    }
+    .item:hover .item-delete {
+      opacity: 1;
+    }
+    .item-delete:hover {
+      color: var(--pink);
+    }
+
+    .btn-reset {
+      position: fixed;
+      top: 20px;
+      right: 24px;
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border: 1px solid var(--line-strong);
+      border-radius: 6px;
+      cursor: pointer;
+      color: var(--muted);
+      transition: color 0.15s, border-color 0.15s, background 0.15s;
+      z-index: 100;
+    }
+
+    .btn-reset:hover {
+      color: var(--pink);
+      border-color: var(--pink);
+      background: #fff0f4;
+    }
+  </style>
+</head>
+<body>
+  <button class="btn-reset" id="btnReset" title="Reset burnlist">
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M1.5 1.5l9 9M10.5 1.5l-9 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+    </svg>
+  </button>
+
+  <div class="container">
+    <header>
+      <h1>Burnlist</h1>
+      <div class="progress-bar">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+      <div class="progress-label" id="progressLabel">0 of 9 done</div>
+    </header>
+
+    <div class="sections">
+    <div class="section">
+      <div class="section-header">
+        <h2 class="section-label">Top 3</h2>
+      </div>
+      <ul class="list" id="list-top">
+        <li class="item" draggable="true">
+          <div class="checkbox-wrap"><input type="checkbox"></div>
+          <span class="item-text-wrap"><span class="item-text" contenteditable="true" spellcheck="false">MVP Discord Bot</span></span>
+          <span class="item-index">Top 01</span>
+          <span class="item-delete" title="Delete"><svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1.5 3.5h10M4.5 3.5V2.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5v1M5.5 6v4M7.5 6v4M2.5 3.5l.75 7a.5.5 0 0 0 .5.5h5.5a.5.5 0 0 0 .5-.5l.75-7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        </li>
+        <li class="item" draggable="true">
+          <div class="checkbox-wrap"><input type="checkbox"></div>
+          <span class="item-text-wrap"><span class="item-text" contenteditable="true" spellcheck="false">Claude Design Bloggish Mockups</span></span>
+          <span class="item-index">Top 02</span>
+          <span class="item-delete" title="Delete"><svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1.5 3.5h10M4.5 3.5V2.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5v1M5.5 6v4M7.5 6v4M2.5 3.5l.75 7a.5.5 0 0 0 .5.5h5.5a.5.5 0 0 0 .5-.5l.75-7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        </li>
+        <li class="item" draggable="true">
+          <div class="checkbox-wrap"><input type="checkbox"></div>
+          <span class="item-text-wrap"><span class="item-text" contenteditable="true" spellcheck="false">Obsidian Sync Writing Replacement</span></span>
+          <span class="item-index">Top 03</span>
+          <span class="item-delete" title="Delete"><svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1.5 3.5h10M4.5 3.5V2.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5v1M5.5 6v4M7.5 6v4M2.5 3.5l.75 7a.5.5 0 0 0 .5.5h5.5a.5.5 0 0 0 .5-.5l.75-7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        </li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <div class="section-header">
+        <h2 class="section-label">The Rest</h2>
+        <button class="btn-new-task" id="btnNewTask">New Task</button>
+      </div>
+      <ul class="list" id="list-rest">
+        <li class="item" draggable="true">
+          <div class="checkbox-wrap"><input type="checkbox"></div>
+          <span class="item-text-wrap"><span class="item-text" contenteditable="true" spellcheck="false">Bookmarks Download and Purge</span></span>
+          <span class="item-index">01</span>
+          <span class="item-delete" title="Delete"><svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1.5 3.5h10M4.5 3.5V2.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5v1M5.5 6v4M7.5 6v4M2.5 3.5l.75 7a.5.5 0 0 0 .5.5h5.5a.5.5 0 0 0 .5-.5l.75-7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        </li>
+        <li class="item" draggable="true">
+          <div class="checkbox-wrap"><input type="checkbox"></div>
+          <span class="item-text-wrap"><span class="item-text" contenteditable="true" spellcheck="false">Digital Ocean Phase Out to Laravel VPS</span></span>
+          <span class="item-index">02</span>
+          <span class="item-delete" title="Delete"><svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1.5 3.5h10M4.5 3.5V2.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5v1M5.5 6v4M7.5 6v4M2.5 3.5l.75 7a.5.5 0 0 0 .5.5h5.5a.5.5 0 0 0 .5-.5l.75-7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        </li>
+        <li class="item" draggable="true">
+          <div class="checkbox-wrap"><input type="checkbox"></div>
+          <span class="item-text-wrap"><span class="item-text" contenteditable="true" spellcheck="false">Instagram AI Purge</span></span>
+          <span class="item-index">03</span>
+          <span class="item-delete" title="Delete"><svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1.5 3.5h10M4.5 3.5V2.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5v1M5.5 6v4M7.5 6v4M2.5 3.5l.75 7a.5.5 0 0 0 .5.5h5.5a.5.5 0 0 0 .5-.5l.75-7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        </li>
+        <li class="item" draggable="true">
+          <div class="checkbox-wrap"><input type="checkbox"></div>
+          <span class="item-text-wrap"><span class="item-text" contenteditable="true" spellcheck="false">YouTube RSS MVP</span></span>
+          <span class="item-index">04</span>
+          <span class="item-delete" title="Delete"><svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1.5 3.5h10M4.5 3.5V2.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5v1M5.5 6v4M7.5 6v4M2.5 3.5l.75 7a.5.5 0 0 0 .5.5h5.5a.5.5 0 0 0 .5-.5l.75-7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        </li>
+        <li class="item" draggable="true">
+          <div class="checkbox-wrap"><input type="checkbox"></div>
+          <span class="item-text-wrap"><span class="item-text" contenteditable="true" spellcheck="false">Roll Geno Custom SVGs and Design Integration</span></span>
+          <span class="item-index">05</span>
+          <span class="item-delete" title="Delete"><svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1.5 3.5h10M4.5 3.5V2.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5v1M5.5 6v4M7.5 6v4M2.5 3.5l.75 7a.5.5 0 0 0 .5.5h5.5a.5.5 0 0 0 .5-.5l.75-7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        </li>
+        <li class="item" draggable="true">
+          <div class="checkbox-wrap"><input type="checkbox"></div>
+          <span class="item-text-wrap"><span class="item-text" contenteditable="true" spellcheck="false">Omnom Log Aesthetic Pass</span></span>
+          <span class="item-index">06</span>
+          <span class="item-delete" title="Delete"><svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1.5 3.5h10M4.5 3.5V2.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5v1M5.5 6v4M7.5 6v4M2.5 3.5l.75 7a.5.5 0 0 0 .5.5h5.5a.5.5 0 0 0 .5-.5l.75-7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        </li>
+      </ul>
+    </div>
+    </div><!-- /.sections -->
+  </div>
+
+  <!-- Context menu -->
+  <div class="ctx-menu" id="ctxMenu">
+    <div class="ctx-label">Highlight</div>
+    <div class="ctx-colors">
+      <div class="ctx-swatch" data-color="cyan" title="Cyan"></div>
+      <div class="ctx-swatch" data-color="green" title="Green"></div>
+      <div class="ctx-swatch" data-color="gold" title="Gold"></div>
+      <div class="ctx-swatch" data-color="pink" title="Pink"></div>
+      <div class="ctx-swatch" data-color="purple" title="Purple"></div>
+    </div>
+    <div class="ctx-divider"></div>
+    <div class="ctx-clear" id="ctxClear">Clear highlight</div>
+  </div>
+
+  <script>
+    const listTop  = document.getElementById('list-top');
+    const listRest = document.getElementById('list-rest');
+    const allLists = [listTop, listRest];
+    const progressFill = document.getElementById('progressFill');
+    const progressLabel = document.getElementById('progressLabel');
+    const ctxMenu = document.getElementById('ctxMenu');
+    const ctxClear = document.getElementById('ctxClear');
+
+    let dragSrc = null;
+    let ctxTarget = null;
+
+    // ── Indices & progress ────────────────────────────────────────────────────
+
+    function updateIndices() {
+      listTop.querySelectorAll('.item').forEach((item, i) => {
+        item.querySelector('.item-index').textContent = `Top ${String(i + 1).padStart(2, '0')}`;
+      });
+      listRest.querySelectorAll('.item').forEach((item, i) => {
+        item.querySelector('.item-index').textContent = String(i + 1).padStart(2, '0');
+      });
+    }
+
+    function updateProgress() {
+      const all  = document.querySelectorAll('.item');
+      const done = document.querySelectorAll('.item.done');
+      const pct  = all.length ? (done.length / all.length) * 100 : 0;
+      progressFill.style.width = pct + '%';
+      progressLabel.textContent = `${done.length} of ${all.length} done`;
+    }
+
+    // ── Delegate events to container ─────────────────────────────────────────
+
+    const container = document.querySelector('.container');
+
+    container.addEventListener('click', (e) => {
+      const btn = e.target.closest('.item-delete');
+      if (!btn) return;
+      btn.closest('.item').remove();
+      updateIndices();
+      updateProgress();
+      saveState();
+    });
+
+    container.addEventListener('change', (e) => {
+      if (e.target.type !== 'checkbox') return;
+      const item = e.target.closest('.item');
+      item.classList.toggle('done', e.target.checked);
+      updateProgress();
+      saveState();
+    });
+
+    container.addEventListener('click', (e) => {
+      const wrap = e.target.closest('.item-text-wrap');
+      if (wrap && e.target !== wrap.querySelector('.item-text')) {
+        const el = wrap.querySelector('.item-text');
+        el.focus();
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        range.collapse(false);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+    });
+
+    container.addEventListener('focusin', (e) => {
+      if (!e.target.classList.contains('item-text')) return;
+      e.target.closest('.item').setAttribute('draggable', 'false');
+    });
+
+    container.addEventListener('focusout', (e) => {
+      if (!e.target.classList.contains('item-text')) return;
+      e.target.closest('.item').setAttribute('draggable', 'true');
+      saveState();
+    });
+
+    container.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && e.target.classList.contains('item-text')) {
+        e.preventDefault();
+        e.target.blur();
+      }
+    });
+
+    container.addEventListener('contextmenu', (e) => {
+      const item = e.target.closest('.item');
+      if (!item) return;
+      e.preventDefault();
+      showCtxMenu(e.clientX, e.clientY, item);
+    });
+
+    // ── Drag & drop (cross-list) ──────────────────────────────────────────────
+
+    container.addEventListener('dragstart', (e) => {
+      const item = e.target.closest('.item');
+      if (!item || item.getAttribute('draggable') === 'false') return;
+      dragSrc = item;
+      setTimeout(() => item.classList.add('dragging'), 0);
+      e.dataTransfer.effectAllowed = 'move';
+    });
+
+    container.addEventListener('dragend', () => {
+      if (!dragSrc) return;
+      dragSrc.classList.remove('dragging');
+      document.querySelectorAll('.item.drag-over').forEach(i => i.classList.remove('drag-over'));
+      dragSrc = null;
+      updateIndices();
+      saveState();
+    });
+
+    // Wire dragover/drop on each list so empty lists also accept drops
+    allLists.forEach(lst => {
+      lst.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        const target = e.target.closest('.item');
+        document.querySelectorAll('.item.drag-over').forEach(i => i.classList.remove('drag-over'));
+        if (target && target !== dragSrc) target.classList.add('drag-over');
+      });
+
+      lst.addEventListener('dragleave', (e) => {
+        // Only clear if leaving the list entirely
+        if (!lst.contains(e.relatedTarget)) {
+          document.querySelectorAll('.item.drag-over').forEach(i => i.classList.remove('drag-over'));
+        }
+      });
+
+      lst.addEventListener('drop', (e) => {
+        e.preventDefault();
+        if (!dragSrc) return;
+        document.querySelectorAll('.item.drag-over').forEach(i => i.classList.remove('drag-over'));
+
+        const target = e.target.closest('.item');
+
+        if (!target || target === dragSrc) {
+          // Dropped onto empty list or onto self — append to this list
+          if (!target) lst.appendChild(dragSrc);
+          return;
+        }
+
+        const items = [...lst.children];
+        if (items.includes(target)) {
+          // Same list reorder
+          const rect = target.getBoundingClientRect();
+          const after = e.clientY > rect.top + rect.height / 2;
+          lst.insertBefore(dragSrc, after ? target.nextSibling : target);
+        } else {
+          // Cross-list: insert before target in target's list
+          const targetList = target.closest('.list');
+          const rect = target.getBoundingClientRect();
+          const after = e.clientY > rect.top + rect.height / 2;
+          targetList.insertBefore(dragSrc, after ? target.nextSibling : target);
+        }
+      });
+    });
+
+    // ── Context menu ──────────────────────────────────────────────────────────
+
+    function hideCtxMenu() {
+      ctxMenu.classList.remove('visible');
+      ctxTarget = null;
+    }
+
+    function showCtxMenu(x, y, item) {
+      ctxTarget = item;
+      const current = item.dataset.highlight || '';
+      ctxMenu.querySelectorAll('.ctx-swatch').forEach(s => {
+        s.classList.toggle('active', s.dataset.color === current);
+      });
+      ctxMenu.style.left = x + 'px';
+      ctxMenu.style.top  = y + 'px';
+      ctxMenu.classList.add('visible');
+      requestAnimationFrame(() => {
+        const rect = ctxMenu.getBoundingClientRect();
+        if (rect.right  > window.innerWidth)  ctxMenu.style.left = (x - rect.width)  + 'px';
+        if (rect.bottom > window.innerHeight) ctxMenu.style.top  = (y - rect.height) + 'px';
+      });
+    }
+
+    ctxMenu.addEventListener('click', (e) => {
+      const swatch = e.target.closest('.ctx-swatch');
+      if (swatch && ctxTarget) {
+        const color = swatch.dataset.color;
+        if (ctxTarget.dataset.highlight === color) delete ctxTarget.dataset.highlight;
+        else ctxTarget.dataset.highlight = color;
+        hideCtxMenu();
+        setTimeout(saveState, 0);
+        return;
+      }
+      if (e.target === ctxClear && ctxTarget) {
+        delete ctxTarget.dataset.highlight;
+        hideCtxMenu();
+        setTimeout(saveState, 0);
+      }
+    });
+
+    document.addEventListener('mousedown', (e) => { if (!ctxMenu.contains(e.target)) hideCtxMenu(); });
+    document.addEventListener('keydown',   (e) => { if (e.key === 'Escape') hideCtxMenu(); });
+
+    // ── File persistence via local server ────────────────────────────────────
+
+    function serializeList(lst) {
+      return [...lst.querySelectorAll('.item')].map(item => ({
+        text:      item.querySelector('.item-text').textContent,
+        done:      item.querySelector('input[type=checkbox]').checked,
+        highlight: item.dataset.highlight || ''
+      }));
+    }
+
+    let saveTimer = null;
+    function saveState() {
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => {
+        fetch('/data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ top: serializeList(listTop), rest: serializeList(listRest) })
+        });
+      }, 300);
+    }
+
+    const TRASH_SVG = `<svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1.5 3.5h10M4.5 3.5V2.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5v1M5.5 6v4M7.5 6v4M2.5 3.5l.75 7a.5.5 0 0 0 .5.5h5.5a.5.5 0 0 0 .5-.5l.75-7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+    function createItem(entry) {
+      const li = document.createElement('li');
+      li.className = 'item' + (entry.done ? ' done' : '');
+      li.setAttribute('draggable', 'true');
+      if (entry.highlight) li.dataset.highlight = entry.highlight;
+      li.innerHTML = `
+        <div class="checkbox-wrap"><input type="checkbox"${entry.done ? ' checked' : ''}></div>
+        <span class="item-text-wrap"><span class="item-text" contenteditable="true" spellcheck="false">${entry.text}</span></span>
+        <span class="item-index"></span>
+        <span class="item-delete" title="Delete">${TRASH_SVG}</span>
+      `;
+      return li;
+    }
+
+    function applyEntries(lst, entries) {
+      lst.innerHTML = '';
+      entries.forEach(entry => lst.appendChild(createItem(entry)));
+    }
+
+    function loadState() {
+      fetch('/data')
+        .then(r => r.json())
+        .then(data => {
+          if (!data) return;
+          if (Array.isArray(data)) {
+            applyEntries(listTop,  data.slice(0, 3));
+            applyEntries(listRest, data.slice(3));
+          } else {
+            if (data.top)  applyEntries(listTop,  data.top);
+            if (data.rest) applyEntries(listRest, data.rest);
+          }
+          updateIndices();
+          updateProgress();
+        })
+        .catch(() => {
+          document.querySelector('.container').innerHTML =
+            '<p style="font-family:var(--font-mono);font-size:13px;color:var(--muted);margin-top:40px;">' +
+            'Run <strong style="color:var(--ink)">start.bat</strong> to launch the server, then open <strong style="color:var(--ink)">http://localhost:3474</strong></p>';
+        });
+    }
+
+    // ── Hot reload ────────────────────────────────────────────────────────────
+    const sse = new EventSource('/sse');
+    sse.addEventListener('message', e => { if (e.data === 'reload') location.reload(); });
+
+    document.getElementById('btnNewTask').addEventListener('click', () => {
+      const item = createItem({ text: '', done: false, highlight: '' });
+      listRest.prepend(item);
+      updateIndices();
+      updateProgress();
+      saveState();
+      item.querySelector('.item-text').focus();
+    });
+
+    document.getElementById('btnReset').addEventListener('click', () => {
+      if (!confirm('You are about to reset the burnlist, continue?')) return;
+      listTop.innerHTML = '';
+      listRest.innerHTML = '';
+      updateIndices();
+      updateProgress();
+      saveState();
+    });
+
+    loadState();
+    updateIndices();
+  </script>
+</body>
+</html>
