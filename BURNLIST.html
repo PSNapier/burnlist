@@ -150,22 +150,33 @@
       display: block;
     }
 
-    .checkbox-wrap input[type="checkbox"]:checked {
+    .checkbox-wrap[data-state="checked"] input[type="checkbox"] {
       background: transparent;
       border-color: var(--line-strong);
     }
 
-    .checkbox-wrap input[type="checkbox"]:checked::after {
-      content: '';
+    .checkbox-wrap[data-state="partial"]::after,
+    .checkbox-wrap[data-state="checked"]::after {
       position: absolute;
-      top: 3px;
-      left: 6px;
-      width: 5px;
-      height: 9px;
-      border: 2px solid var(--muted);
-      border-top: none;
-      border-left: none;
-      transform: rotate(45deg);
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -52%);
+      pointer-events: none;
+      z-index: 2;
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--muted);
+      line-height: 1;
+    }
+
+    .checkbox-wrap[data-state="partial"]::after {
+      content: '/';
+    }
+
+    .checkbox-wrap[data-state="checked"]::after {
+      content: 'X';
+      font-size: 9px;
+      letter-spacing: 0;
     }
 
     /* Text wrapper for highlight underline effect */
@@ -527,12 +538,26 @@
       });
     }
 
+    function progressWeightForItem(item) {
+      const s = item.querySelector('.checkbox-wrap')?.dataset.state || 'unchecked';
+      if (s === 'checked') return 1;
+      if (s === 'partial') return 0.5;
+      return 0;
+    }
+
+    function formatDonePoints(sum) {
+      const v = Math.round(sum * 2) / 2;
+      return Number.isInteger(v) ? String(v) : v.toFixed(1);
+    }
+
     function updateProgress() {
-      const all  = document.querySelectorAll('.item');
-      const done = document.querySelectorAll('.item.done');
-      const pct  = all.length ? (done.length / all.length) * 100 : 0;
+      const all = document.querySelectorAll('.item');
+      let sum = 0;
+      all.forEach(item => { sum += progressWeightForItem(item); });
+      const n = all.length;
+      const pct = n ? (sum / n) * 100 : 0;
       progressFill.style.width = pct + '%';
-      progressLabel.textContent = `${done.length} of ${all.length} done`;
+      progressLabel.textContent = `${formatDonePoints(sum)} of ${n} done`;
     }
 
     // ── Delegate events to container ─────────────────────────────────────────
@@ -548,10 +573,47 @@
       saveState();
     });
 
-    container.addEventListener('change', (e) => {
-      if (e.target.type !== 'checkbox') return;
-      const item = e.target.closest('.item');
-      item.classList.toggle('done', e.target.checked);
+    const CHECKBOX_CYCLE = ['unchecked', 'partial', 'checked'];
+
+    function normalizeCheckboxState(entry) {
+      if (entry.state === 'unchecked' || entry.state === 'partial' || entry.state === 'checked') return entry.state;
+      return entry.done ? 'checked' : 'unchecked';
+    }
+
+    function applyCheckboxState(wrap, state) {
+      const input = wrap.querySelector('input[type="checkbox"]');
+      const item = wrap.closest('.item');
+      wrap.dataset.state = state;
+      if (state === 'unchecked') {
+        input.checked = false;
+        input.indeterminate = false;
+        item.classList.remove('done');
+      } else if (state === 'partial') {
+        input.checked = false;
+        input.indeterminate = true;
+        item.classList.remove('done');
+      } else {
+        input.checked = true;
+        input.indeterminate = false;
+        item.classList.add('done');
+      }
+    }
+
+    function initCheckboxStatesInDom() {
+      document.querySelectorAll('.checkbox-wrap').forEach(wrap => {
+        const s = wrap.dataset.state;
+        applyCheckboxState(wrap, (s === 'partial' || s === 'checked' || s === 'unchecked') ? s : 'unchecked');
+      });
+    }
+
+    container.addEventListener('click', (e) => {
+      const input = e.target.closest('.checkbox-wrap input[type="checkbox"]');
+      if (!input) return;
+      e.preventDefault();
+      const wrap = input.closest('.checkbox-wrap');
+      const i = CHECKBOX_CYCLE.indexOf(wrap.dataset.state || 'unchecked');
+      const idx = i === -1 ? 0 : i;
+      applyCheckboxState(wrap, CHECKBOX_CYCLE[(idx + 1) % CHECKBOX_CYCLE.length]);
       updateProgress();
       saveState();
     });
@@ -708,7 +770,7 @@
     function serializeList(lst) {
       return [...lst.querySelectorAll('.item')].map(item => ({
         text:      item.querySelector('.item-text').textContent,
-        done:      item.querySelector('input[type=checkbox]').checked,
+        state:     item.querySelector('.checkbox-wrap').dataset.state || 'unchecked',
         highlight: item.dataset.highlight || ''
       }));
     }
@@ -728,16 +790,18 @@
     const TRASH_SVG = `<svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1.5 3.5h10M4.5 3.5V2.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5v1M5.5 6v4M7.5 6v4M2.5 3.5l.75 7a.5.5 0 0 0 .5.5h5.5a.5.5 0 0 0 .5-.5l.75-7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
     function createItem(entry) {
+      const state = normalizeCheckboxState(entry);
       const li = document.createElement('li');
-      li.className = 'item' + (entry.done ? ' done' : '');
+      li.className = 'item' + (state === 'checked' ? ' done' : '');
       li.setAttribute('draggable', 'true');
       if (entry.highlight) li.dataset.highlight = entry.highlight;
       li.innerHTML = `
-        <div class="checkbox-wrap"><input type="checkbox"${entry.done ? ' checked' : ''}></div>
+        <div class="checkbox-wrap"><input type="checkbox"></div>
         <span class="item-text-wrap"><span class="item-text" contenteditable="true" spellcheck="false">${entry.text}</span></span>
         <span class="item-index"></span>
         <span class="item-delete" title="Delete">${TRASH_SVG}</span>
       `;
+      applyCheckboxState(li.querySelector('.checkbox-wrap'), state);
       return li;
     }
 
@@ -750,7 +814,12 @@
       fetch('/data')
         .then(r => r.json())
         .then(data => {
-          if (!data) return;
+          if (!data) {
+            initCheckboxStatesInDom();
+            updateIndices();
+            updateProgress();
+            return;
+          }
           if (Array.isArray(data)) {
             applyEntries(listTop,  data.slice(0, 3));
             applyEntries(listRest, data.slice(3));
@@ -773,7 +842,7 @@
     sse.addEventListener('message', e => { if (e.data === 'reload') location.reload(); });
 
     document.getElementById('btnNewTask').addEventListener('click', () => {
-      const item = createItem({ text: '', done: false, highlight: '' });
+      const item = createItem({ text: '', state: 'unchecked', highlight: '' });
       listRest.prepend(item);
       updateIndices();
       updateProgress();
@@ -792,6 +861,7 @@
 
     loadState();
     updateIndices();
+    updateProgress();
   </script>
 </body>
 </html>
